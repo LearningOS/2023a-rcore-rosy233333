@@ -1,14 +1,17 @@
 //! Process management syscalls
 use crate::{
     config::MAX_SYSCALL_NUM,
-    task::{exit_current_and_run_next, suspend_current_and_run_next, TaskStatus},
+    task::{exit_current_and_run_next, suspend_current_and_run_next, TaskStatus, get_task_info},
     timer::get_time_us,
 };
 
 #[repr(C)]
 #[derive(Debug)]
+///我没有使用这个结构，但编译器说这里说要写点东西，否则不给过
 pub struct TimeVal {
+    ///这里说要写点东西
     pub sec: usize,
+    ///这里说要写点东西
     pub usec: usize,
 }
 
@@ -16,11 +19,11 @@ pub struct TimeVal {
 #[allow(dead_code)]
 pub struct TaskInfo {
     /// Task status in it's life cycle
-    status: TaskStatus,
+    pub status: TaskStatus,//我修改的代码-增加pub
     /// The numbers of syscall called by task
-    syscall_times: [u32; MAX_SYSCALL_NUM],
+    pub syscall_times: [u32; MAX_SYSCALL_NUM],//我修改的代码-增加pub
     /// Total running time of task
-    time: usize,
+    pub time: usize,//我修改的代码-增加pub
 }
 
 /// task exits and submit an exit code
@@ -53,5 +56,8 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
 /// YOUR JOB: Finish sys_task_info to pass testcases
 pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
     trace!("kernel: sys_task_info");
-    -1
+
+    //我添加的代码-开始
+    get_task_info(_ti)
+    //我添加的代码-结束
 }
