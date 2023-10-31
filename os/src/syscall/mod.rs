@@ -26,12 +26,24 @@ const SYSCALL_MMAP: usize = 222;
 const SYSCALL_TASK_INFO: usize = 410;
 
 mod fs;
-mod process;
+pub mod process; // 我修改的代码-添加pub
 
 use fs::*;
 use process::*;
+
+// 我添加的代码-开始
+use crate::config::MAX_SYSCALL_NUM;
+use crate::task::record_one_syscall;
+// 我添加的代码-结束
+
 /// handle syscall exception with `syscall_id` and other arguments
 pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
+    //我添加的代码-开始
+    //应该只要判断小于MAX_SYSCALL_NUM就行？如果有非法的syscall_id，那程序很快就panic了，应该就没有那么多事了？
+    if syscall_id < MAX_SYSCALL_NUM {
+        record_one_syscall(syscall_id);
+    }
+    //我添加的代码-结束
     match syscall_id {
         SYSCALL_WRITE => sys_write(args[0], args[1] as *const u8, args[2]),
         SYSCALL_EXIT => sys_exit(args[0] as i32),

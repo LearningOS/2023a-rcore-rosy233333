@@ -6,6 +6,10 @@ use crate::mm::{
 };
 use crate::trap::{trap_handler, TrapContext};
 
+// 我添加的代码-开始
+use crate::config::MAX_SYSCALL_NUM;
+// 我添加的代码-结束
+
 /// The task control block (TCB) of a task.
 pub struct TaskControlBlock {
     /// Save task context
@@ -28,6 +32,15 @@ pub struct TaskControlBlock {
 
     /// Program break
     pub program_brk: usize,
+
+    //我添加的代码-开始
+    ///使用桶计数存储的系统调用计数
+    pub syscall_times: [u32; MAX_SYSCALL_NUM],
+    ///程序是否已经开始
+    pub started: bool,
+    ///程序的开始时间
+    pub start_time_us: usize
+    //我添加的代码-结束
 }
 
 impl TaskControlBlock {
@@ -63,6 +76,11 @@ impl TaskControlBlock {
             base_size: user_sp,
             heap_bottom: user_sp,
             program_brk: user_sp,
+            // 我添加的代码-开始
+            syscall_times: [0; MAX_SYSCALL_NUM],
+            started: false,
+            start_time_us: 0
+            // 我添加的代码-结束
         };
         // prepare TrapContext in user space
         let trap_cx = task_control_block.get_trap_cx();
