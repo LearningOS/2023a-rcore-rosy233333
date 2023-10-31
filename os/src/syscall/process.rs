@@ -8,14 +8,25 @@ use crate::{
     mm::{translated_refmut, translated_str},
     task::{
         add_task, current_task, current_user_token, exit_current_and_run_next,
-        suspend_current_and_run_next, TaskStatus,
+        suspend_current_and_run_next, TaskStatus, map_current_va_range, unmap_current_va_range,
     },
+    mm::{PageTable, VirtAddr, MapPermission}
 };
+// 我添加的代码-开始
+use crate::task::current_user_token;
+use crate::timer::get_time_us;
+use crate::task::get_task_info;
+//use crate::mm::memory_set::{MemorySet, MapArea};
+use crate::config::PAGE_SIZE;
+// 我添加的代码-结束
 
+/// 包含sec和usec的代表时间的结构体
 #[repr(C)]
 #[derive(Debug)]
 pub struct TimeVal {
+    /// 秒
     pub sec: usize,
+    /// 微秒
     pub usec: usize,
 }
 
@@ -23,11 +34,11 @@ pub struct TimeVal {
 #[allow(dead_code)]
 pub struct TaskInfo {
     /// Task status in it's life cycle
-    status: TaskStatus,
+    pub status: TaskStatus,
     /// The numbers of syscall called by task
-    syscall_times: [u32; MAX_SYSCALL_NUM],
+    pub syscall_times: [u32; MAX_SYSCALL_NUM],
     /// Total running time of task
-    time: usize,
+    pub time: usize,
 }
 
 pub fn sys_exit(exit_code: i32) -> ! {
@@ -129,29 +140,86 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TaskInfo`] is splitted by two pages ?
 pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_task_info NOT IMPLEMENTED",
-        current_task().unwrap().pid.0
-    );
-    -1
+    trace!("kernel: sys_task_info NOT IMPLEMENTED YET!");
+    
+    // 我添加的代码-开始
+    // 在第3章，我自己实现的的sys_task_info上修改
+    let mut ti_temp = TaskInfo{
+        status: TaskStatus::Running,
+        syscall_times: [0; MAX_SYSCALL_NUM],
+        time: 0
+    };
+    get_task_info(&mut ti_temp as *mut TaskInfo);
+
+    unsafe{
+        let ti_status_va = &((*_ti).status) as *const TaskStatus;
+        let ti_time_va = &((*_ti).time) as *const usize;
+        let ti_status_pa = map_user_va_to_pa(ti_status_va as usize) as *mut TaskStatus;
+        let ti_time_pa = map_user_va_to_pa(ti_time_va as usize) as *mut usize;
+        *ti_status_pa = ti_temp.status;
+        *ti_time_pa = ti_temp.time;
+        for i in 0..MAX_SYSCALL_NUM {
+            let ti_syscall_time_va = &((*_ti).syscall_times[i]) as *const u32;
+            let ti_syscall_time_pa = map_user_va_to_pa(ti_syscall_time_va as usize) as *mut u32;
+            *ti_syscall_time_pa = ti_temp.syscall_times[i];
+        }
+    }
+    
+    // 我添加的代码-结束
+    0
 }
 
-/// YOUR JOB: Implement mmap.
+// YOUR JOB: Implement mmap.
+/// 映射内存
 pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_mmap NOT IMPLEMENTED",
-        current_task().unwrap().pid.0
-    );
-    -1
+    trace!("kernel: sys_mmap NOT IMPLEMENTED YET!");
+
+    // 我添加的代码-开始
+    // 判断地址是否对齐
+    if _start & (PAGE_SIZE - 1) != 0 {
+        return -1;
+    }
+    
+    // 判断port是否合法
+    if (_port & (!0x7) != 0) || (_port & 0x7 == 0) {
+        return -1;
+    }
+
+    let va_low = VirtAddr::from(_start);
+    // 要映射的地址不包含va_high
+    let va_high = VirtAddr::from(_start + _len);
+    let mut permission: MapPermission = MapPermission::U;
+    if _port & (1 << 0) != 0 {
+        permission = permission | MapPermission::R;
+    }
+    if _port & (1 << 1) != 0 {
+        permission = permission | MapPermission::W;
+    }
+    if _port & (1 << 2) != 0 {
+        permission = permission | MapPermission::X;
+    }
+
+    map_current_va_range(va_low, va_high, permission)
+    // 我添加的代码-结束
 }
 
-/// YOUR JOB: Implement munmap.
+// YOUR JOB: Implement munmap.
+/// 取消内存映射
 pub fn sys_munmap(_start: usize, _len: usize) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_munmap NOT IMPLEMENTED",
-        current_task().unwrap().pid.0
-    );
-    -1
+    trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
+
+    // 我添加的代码-开始
+    // 判断地址是否对齐
+    if _start & (PAGE_SIZE - 1) != 0 {
+        return -1;
+    }
+
+    let va_low = VirtAddr::from(_start);
+    // 要释放的地址不包含va_high
+    let va_high = VirtAddr::from(_start + _len);
+
+    unmap_current_va_range(va_low, va_high)
+    // 我添加的代码-结束
 }
 
 /// change data segment size

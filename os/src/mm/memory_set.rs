@@ -318,16 +318,91 @@ impl MemorySet {
             false
         }
     }
+
+    // 我新增的代码-开始
+    /// 根据虚拟页号找到其所在的段，并将其弹出（方便后续操作）
+    fn find_map_area(&mut self, vpn: VirtPageNum) -> Option<MapArea>{
+        for index in 0 .. self.areas.len() {
+            let map_area = &(self.areas[index]);
+            if map_area.vpn_range.get_start() <= vpn && map_area.vpn_range.get_end() > vpn {
+                return Some(self.areas.swap_remove(index));
+            }
+        }
+        None
+    }
+
+    /// 映射一个虚拟页号范围
+    #[allow(unused_variables)]
+    pub fn map_va_range(&mut self, va_low: VirtAddr, va_high: VirtAddr, permission: MapPermission) -> isize {
+        // 判断这些页号是否被映射过
+        for vpn_value in va_low.floor().0 .. va_high.ceil().0 {
+            let vpn = VirtPageNum(vpn_value);
+            match self.translate(vpn) {
+                Some(pte) => {
+                    if pte.is_valid() {
+                        return -1;
+                    }
+                },
+                None => {}
+            }
+        }
+
+        //分配内存
+        if va_low < va_high {
+            self.insert_framed_area(va_low, va_high, permission);
+        }
+
+        0
+    }
+
+    /// 取消映射一个虚拟页号范围
+    #[allow(unused_variables)]
+    pub fn unmap_va_range(&mut self, va_low: VirtAddr, va_high: VirtAddr) -> isize {
+        // 判断这些页号是否未被映射
+        for vpn_value in va_low.floor().0 .. va_high.ceil().0 {
+            let vpn = VirtPageNum(vpn_value);
+            match self.translate(vpn) {
+                Some(pte) => {
+                    if !(pte.is_valid()) {
+                        return -1;
+                    }
+                },
+                None => {
+                    return -1;
+                }
+            }
+        }
+
+        // 释放内存
+        for vpn_value in va_low.floor().0 .. va_high.ceil().0 {
+            let vpn = VirtPageNum(vpn_value);
+            match self.find_map_area(vpn) {
+                Some(mut map_area) => {
+                    map_area.unmap_one(&mut (self.page_table), vpn);
+                    self.areas.push(map_area);
+                },
+                None => {
+                    return -1;
+                }
+            }
+        }
+
+        0
+    }
+    // 我新增的代码-结束
 }
 /// map area structure, controls a contiguous piece of virtual memory
 pub struct MapArea {
-    vpn_range: VPNRange,
+    /// 虚拟页号的范围
+    pub vpn_range: VPNRange,
     data_frames: BTreeMap<VirtPageNum, FrameTracker>,
     map_type: MapType,
     map_perm: MapPermission,
 }
 
+#[allow(missing_docs)]
 impl MapArea {
+    /// 新建一个段
     pub fn new(
         start_va: VirtAddr,
         end_va: VirtAddr,
@@ -351,6 +426,7 @@ impl MapArea {
             map_perm: another.map_perm,
         }
     }
+    /// ...
     pub fn map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
         let ppn: PhysPageNum;
         match self.map_type {
@@ -423,7 +499,9 @@ impl MapArea {
 #[derive(Copy, Clone, PartialEq, Debug)]
 /// map type for memory set: identical or framed
 pub enum MapType {
+    /// 恒等映射
     Identical,
+    /// 不恒等的映射
     Framed,
 }
 
