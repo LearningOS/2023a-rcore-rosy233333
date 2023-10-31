@@ -8,13 +8,21 @@ use bitflags::*;
 bitflags! {
     /// page table entry flags
     pub struct PTEFlags: u8 {
+        /// Valid，是否有效
         const V = 1 << 0;
+        /// Read，是否可读
         const R = 1 << 1;
+        /// eXcute，是否可执行
         const W = 1 << 2;
+        /// Write，是否可写
         const X = 1 << 3;
+        /// User，是否可在U特权级访问
         const U = 1 << 4;
+        /// Global，暂时不管
         const G = 1 << 5;
+        /// Accessed，是否被访问过
         const A = 1 << 6;
+        /// Dirty，是否被修改过
         const D = 1 << 7;
     }
 }
