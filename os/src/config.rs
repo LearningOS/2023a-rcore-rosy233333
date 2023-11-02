@@ -23,3 +23,7 @@ pub const TRAP_CONTEXT_BASE: usize = TRAMPOLINE - PAGE_SIZE;
 pub const CLOCK_FREQ: usize = 12500000;
 /// the physical memory end
 pub const MEMORY_END: usize = 0x88000000;
+// 我添加的代码-开始
+/// 用于stride进程调度算法的BIG_STRIDE值，为2^8*3^4*5^4
+pub const BIG_STRIDE: usize = 12960000;
+// 我添加的代码-结束

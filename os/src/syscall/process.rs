@@ -2,21 +2,21 @@
 use alloc::sync::Arc;
 
 use crate::{
-    config::MAX_SYSCALL_NUM,
+    config::{MAX_SYSCALL_NUM, PAGE_SIZE_BITS},
     loader::get_app_data_by_name,
     mm::{translated_refmut, translated_str},
     task::{
         add_task, current_task, current_user_token, exit_current_and_run_next,
-        suspend_current_and_run_next, TaskStatus, map_current_va_range, unmap_current_va_range,
+        suspend_current_and_run_next, TaskStatus, TaskControlBlock,
     },
     mm::{PageTable, VirtAddr, MapPermission}
 };
 // 我添加的代码-开始
-use crate::task::current_user_token;
+//use crate::task::current_user_token;
 use crate::timer::get_time_us;
-use crate::task::get_task_info;
 //use crate::mm::memory_set::{MemorySet, MapArea};
 use crate::config::PAGE_SIZE;
+use crate::task::processor::{map_current_va_range, unmap_current_va_range, get_task_info};
 // 我添加的代码-结束
 
 /// 包含sec和usec的代表时间的结构体
@@ -54,11 +54,13 @@ pub fn sys_yield() -> isize {
     0
 }
 
+/// 获得进程的pid
 pub fn sys_getpid() -> isize {
     trace!("kernel: sys_getpid pid:{}", current_task().unwrap().pid.0);
     current_task().unwrap().pid.0 as isize
 }
 
+/// fork进程
 pub fn sys_fork() -> isize {
     trace!("kernel:pid[{}] sys_fork", current_task().unwrap().pid.0);
     let current_task = current_task().unwrap();
@@ -74,6 +76,7 @@ pub fn sys_fork() -> isize {
     new_pid as isize
 }
 
+/// 在当前进程执行特定程序
 pub fn sys_exec(path: *const u8) -> isize {
     trace!("kernel:pid[{}] sys_exec", current_task().unwrap().pid.0);
     let token = current_user_token();
@@ -125,22 +128,46 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
     // ---- release current PCB automatically
 }
 
+// 我添加的代码-开始
+/// 将某个存储单元的用户空间地址转化为物理地址，以供读写
+fn map_user_va_to_pa(user_va: usize) -> usize {
+    let user_page_table = PageTable::from_token(current_user_token());
+    let vpn = VirtAddr(user_va).floor();
+    let offset = VirtAddr(user_va).page_offset();
+    let ppn = user_page_table.translate(vpn).unwrap().ppn();
+    (ppn.0 << PAGE_SIZE_BITS) + offset
+}
+// 我添加的代码-结束
+
 /// YOUR JOB: get time with second and microsecond
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
 pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_get_time NOT IMPLEMENTED",
-        current_task().unwrap().pid.0
-    );
-    -1
+    trace!("kernel: sys_get_time");
+    // 我添加的代码-开始
+    // 在第3章的sys_get_time上修改
+    let us = get_time_us();
+    unsafe {
+        //*ts = TimeVal {
+        //    sec: us / 1_000_000,
+        //    usec: us % 1_000_000,
+        //};
+        let ts_sec_va = &((*_ts).sec) as *const usize;
+        let ts_usec_va = &((*_ts).usec) as *const usize;
+        let ts_sec_pa = map_user_va_to_pa(ts_sec_va as usize) as *mut usize;
+        let ts_usec_pa = map_user_va_to_pa(ts_usec_va as usize) as *mut usize;
+        *ts_sec_pa = us / 1_000_000;
+        *ts_usec_pa = us % 1_000_000;
+    }
+    // 我添加的代码-结束
+    0
 }
 
 /// YOUR JOB: Finish sys_task_info to pass testcases
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TaskInfo`] is splitted by two pages ?
 pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
-    trace!("kernel: sys_task_info NOT IMPLEMENTED YET!");
+    trace!("kernel: sys_task_info");
     
     // 我添加的代码-开始
     // 在第3章，我自己实现的的sys_task_info上修改
@@ -172,7 +199,7 @@ pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
 // YOUR JOB: Implement mmap.
 /// 映射内存
 pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
-    trace!("kernel: sys_mmap NOT IMPLEMENTED YET!");
+    trace!("kernel: sys_mmap");
 
     // 我添加的代码-开始
     // 判断地址是否对齐
@@ -206,7 +233,7 @@ pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
 // YOUR JOB: Implement munmap.
 /// 取消内存映射
 pub fn sys_munmap(_start: usize, _len: usize) -> isize {
-    trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
+    trace!("kernel: sys_munmap");
 
     // 我添加的代码-开始
     // 判断地址是否对齐
@@ -236,17 +263,46 @@ pub fn sys_sbrk(size: i32) -> isize {
 /// HINT: fork + exec =/= spawn
 pub fn sys_spawn(_path: *const u8) -> isize {
     trace!(
-        "kernel:pid[{}] sys_spawn NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_spawn",
         current_task().unwrap().pid.0
     );
-    -1
+    // 我添加的代码-开始
+    // 参考了实验os源代码中`fork`和`exec`的实现
+    let token = current_user_token();
+    let path = translated_str(token,_path);
+    if let Some(data) = get_app_data_by_name(path.as_str()) {
+        let current_task = current_task().unwrap();
+        // 创建新进程
+        let new_task = Arc::new(TaskControlBlock::new(data));
+
+        // 维护父子关系
+        current_task.inner_exclusive_access().children.push(new_task.clone());
+        new_task.inner_exclusive_access().parent = Some(Arc::downgrade(&current_task));
+
+        let new_pid = new_task.pid.0;
+        add_task(new_task);
+        new_pid as isize
+    } else {
+        -1
+    }
+    // 我添加的代码-结束
 }
 
-// YOUR JOB: Set task priority.
+/// YOUR JOB: Set task priority.
+/// 设置优先级
 pub fn sys_set_priority(_prio: isize) -> isize {
     trace!(
-        "kernel:pid[{}] sys_set_priority NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_set_priority",
         current_task().unwrap().pid.0
     );
-    -1
+    // 我添加的代码-开始
+    if _prio >= 2 {
+        let task = current_task().unwrap();
+        task.inner_exclusive_access().priority = _prio as usize;
+        _prio
+    }
+    else {
+        -1
+    }
+    // 我添加的代码-结束
 }

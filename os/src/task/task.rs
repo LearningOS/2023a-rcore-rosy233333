@@ -79,7 +79,11 @@ pub struct TaskControlBlockInner {
     ///程序是否已经开始
     pub started: bool,
     ///程序的开始时间
-    pub start_time_us: usize
+    pub start_time_us: usize,
+    ///程序的优先级
+    pub priority: usize,
+    ///程序的stride
+    pub stride: usize
     //我添加的代码-结束
 }
 
@@ -131,13 +135,15 @@ impl TaskControlBlock {
                     exit_code: 0,
                     heap_bottom: user_sp,
                     program_brk: user_sp,
+                    // 我添加的代码-开始
+                    syscall_times: [0; MAX_SYSCALL_NUM],
+                    started: false,
+                    start_time_us: 0,
+                    priority: 16,
+                    stride: 0
+                    // 我添加的代码-结束
                 })
             },
-            // 我添加的代码-开始
-            syscall_times: [0; MAX_SYSCALL_NUM],
-            started: false,
-            start_time_us: 0
-            // 我添加的代码-结束
         };
         // prepare TrapContext in user space
         let trap_cx = task_control_block.inner_exclusive_access().get_trap_cx();
@@ -209,6 +215,13 @@ impl TaskControlBlock {
                     exit_code: 0,
                     heap_bottom: parent_inner.heap_bottom,
                     program_brk: parent_inner.program_brk,
+                    // 我添加的代码-开始
+                    syscall_times: [0; MAX_SYSCALL_NUM],
+                    started: false,
+                    start_time_us: 0,
+                    priority: 16,
+                    stride: 0
+                    // 我添加的代码-结束
                 })
             },
         });
