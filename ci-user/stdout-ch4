@@ -1,0 +1,136 @@
+make[1]: Entering directory '/home/rosy/Desktop/oslab-part2/2023a-rcore-rosy233333/os'
+cargo build --release
+timeout --foreground 300s qemu-system-riscv64 \
+	-machine virt \
+	-nographic \
+	-bios ../bootloader/rustsbi-qemu.bin \
+	-kernel target/riscv64gc-unknown-none-elf/release/os
+[rustsbi] RustSBI version 0.3.0-alpha.2, adapting to RISC-V SBI v1.0.0
+.______       __    __      _______.___________.  _______..______   __
+|   _  \     |  |  |  |    /       |           | /       ||   _  \ |  |
+|  |_)  |    |  |  |  |   |   (----`---|  |----`|   (----`|  |_)  ||  |
+|      /     |  |  |  |    \   \       |  |      \   \    |   _  < |  |
+|  |\  \----.|  `--'  |.----)   |      |  |  .----)   |   |  |_)  ||  |
+| _| `._____| \______/ |_______/       |__|  |_______/    |______/ |__|
+[rustsbi] Implementation     : RustSBI-QEMU Version 0.2.0-alpha.2
+[rustsbi] Platform Name      : riscv-virtio,qemu
+[rustsbi] Platform SMP       : 1
+[rustsbi] Platform Memory    : 0x80000000..0x88000000
+[rustsbi] Boot HART          : 0
+[rustsbi] Device Tree Region : 0x87000000..0x87000ef2
+[rustsbi] Firmware Address   : 0x80000000
+[rustsbi] Supervisor Address : 0x80200000
+[rustsbi] pmp01: 0x00000000..0x80000000 (-wr)
+[rustsbi] pmp02: 0x80000000..0x80200000 (---)
+[rustsbi] pmp03: 0x80200000..0x88000000 (xwr)
+[rustsbi] pmp04: 0x88000000..0x00000000 (-wr)
+[kernel] Hello, world!
+[kernel] back to world!
+remap_test passed!
+init TASK_MANAGER
+num_app = 20
+[kernel] IllegalInstruction in application, kernel killed it.
+[kernel] IllegalInstruction in application, kernel killed it.
+Hello, world from user mode program!
+power_3 [10000/200000]
+power_3 [20000/200000]
+power_3 [30000/200000]
+power_3 [40000/200000]
+power_3 [50000/200000]
+power_3 [60000/200000]
+power_3 [70000/200000]
+power_5 [10000/140000]
+power_5 [20000/140000]
+power_5 [30000/140000]
+power_5 [40000/140000]
+power_7 [10000/160000]
+power_7 [20000/160000]
+power_7 [30000/160000]
+power_7 [40000/160000]
+power_7 [50000/160000]
+power_7 [60000/160000]
+power_7 [70000/160000]
+power_7 [80000/160000]
+power_7 [90000/160000]
+power_7 [100000/160000]
+get_time OK13474570142692941909135733197429902605031340645970515003800272655827562602343363982117232835364802685533333! 234
+current time_msec = 239
+AAAAAAAAAA [1/5]
+CCCCCCCCCC [1/5]
+Test 04_1 OK13474570142692941909135733197429902605031340645970515003800272655827562602343363982117232835364802685533333!
+[kernel] PageFault in application, bad addr = 0x10000000, bad instruction = 0x4fc, kernel killed it.
+[kernel] PageFault in application, bad addr = 0x10000000, bad instruction = 0x4fa, kernel killed it.
+Test 04_4 test OK13474570142692941909135733197429902605031340645970515003800272655827562602343363982117232835364802685533333!
+Test 04_6 ummap2 OK13474570142692941909135733197429902605031340645970515003800272655827562602343363982117232835364802685533333!
+Test sbrk start.
+origin break point = c000
+one page allocated,  break point = d000
+try write to allocated page
+write ok
+10 page allocated,  break point = 17000
+[kernel] PageFault in application, bad addr = 0x0, bad instruction = 0x3c4, kernel killed it.
+power_3 [80000/200000]
+power_3 [90000/200000]
+power_3 [100000/200000]
+power_3 [110000/200000]
+power_3 [120000/200000]
+power_3 [130000/200000]
+power_3 [140000/200000]
+power_3 [150000/200000]
+power_3 [160000/200000]
+power_3 [170000/200000]
+power_3 [180000/200000]
+power_3 [190000/200000]
+power_3 [200000/200000]
+3^200000 = 871008973(MOD 998244353)
+Test power_3 OK13474570142692941909135733197429902605031340645970515003800272655827562602343363982117232835364802685533333!
+power_5 [50000/140000]
+power_5 [60000/140000]
+power_5 [70000/140000]
+power_5 [80000/140000]
+power_5 [90000/140000]
+power_5 [100000/140000]
+power_5 [110000/140000]
+power_7 [110000/160000]
+power_7 [120000/160000]
+power_7 [130000/160000]
+power_7 [140000/160000]
+power_7 [150000/160000]
+power_7 [160000/160000]
+7^160000 = 667897727(MOD 998244353)
+Test power_7 OK13474570142692941909135733197429902605031340645970515003800272655827562602343363982117232835364802685533333!
+AAAAAAAAAA [2/5]
+BBBBBBBBBB [1/5]
+CCCCCCCCCC [2/5]
+Test 04_5 ummap OK13474570142692941909135733197429902605031340645970515003800272655827562602343363982117232835364802685533333!
+11 page DEALLOCATED,  break point = c000
+try DEALLOCATED more one page, should be failed.
+Test sbrk almost OK13474570142692941909135733197429902605031340645970515003800272655827562602343363982117232835364802685533333!
+now write to deallocated page, should cause page fault.
+[kernel] PageFault in application, bad addr = 0xc000, bad instruction = 0x5d0, kernel killed it.
+power_5 [120000/140000]
+AAAAAAAAAA [3/5]
+BBBBBBBBBB [2/5]
+CCCCCCCCCC [3/5]
+power_5 [130000/140000]
+power_5 [140000/140000]
+5^140000 = 386471875(MOD 998244353)
+Test power_5 OK13474570142692941909135733197429902605031340645970515003800272655827562602343363982117232835364802685533333!
+AAAAAAAAAA [4/5]
+BBBBBBBBBB [3/5]
+CCCCCCCCCC [4/5]
+AAAAAAAAAA [5/5]
+BBBBBBBBBB [4/5]
+CCCCCCCCCC [5/5]
+Test write A OK13474570142692941909135733197429902605031340645970515003800272655827562602343363982117232835364802685533333!
+BBBBBBBBBB [5/5]
+Test write C OK13474570142692941909135733197429902605031340645970515003800272655827562602343363982117232835364802685533333!
+Test write B OK13474570142692941909135733197429902605031340645970515003800272655827562602343363982117232835364802685533333!
+time_msec = 342 after sleeping 100 ticks, delta = 103ms!
+Test sleep1 passed13474570142692941909135733197429902605031340645970515003800272655827562602343363982117232835364802685533333!
+string from task info test
+
+Test task info OK13474570142692941909135733197429902605031340645970515003800272655827562602343363982117232835364802685533333!
+Test sleep OK13474570142692941909135733197429902605031340645970515003800272655827562602343363982117232835364802685533333!
+[kernel] Panicked at src/task/mod.rs:170 All applications completed!
+make[1]: Leaving directory '/home/rosy/Desktop/oslab-part2/2023a-rcore-rosy233333/os'
