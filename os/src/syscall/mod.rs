@@ -62,7 +62,7 @@ use crate::fs::Stat;
 
 // 我添加的代码-开始
 use crate::config::MAX_SYSCALL_NUM;
-use crate::task::record_one_syscall;
+use crate::task::processor::record_one_syscall;
 // 我添加的代码-结束
 
 /// handle syscall exception with `syscall_id` and other arguments

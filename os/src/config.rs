@@ -25,3 +25,7 @@ pub const CLOCK_FREQ: usize = 12500000;
 pub const MEMORY_END: usize = 0x88000000;
 /// The base address of control registers in Virtio_Block device
 pub const MMIO: &[(usize, usize)] = &[(0x10001000, 0x1000)];
+// 我添加的代码-开始
+/// 用于stride进程调度算法的BIG_STRIDE值，为2^8*3^4*5^4
+pub const BIG_STRIDE: usize = 12960000;
+// 我添加的代码-结束

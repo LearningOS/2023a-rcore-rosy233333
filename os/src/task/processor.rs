@@ -12,6 +12,12 @@ use crate::trap::TrapContext;
 use alloc::sync::Arc;
 use lazy_static::*;
 
+// 我添加的代码-开始
+use crate::timer::get_time_us;
+use crate::syscall::process::TaskInfo;
+use crate::mm::{VirtAddr, MapPermission};
+// 我添加的代码-结束
+
 /// Processor management structure
 pub struct Processor {
     ///The task currently executing on the current processor
@@ -44,9 +50,46 @@ impl Processor {
     pub fn current(&self) -> Option<Arc<TaskControlBlock>> {
         self.current.as_ref().map(Arc::clone)
     }
+
+    //我添加的代码-开始
+    ///在当前进程中记录一次中断调用
+    fn record_one_syscall(&mut self, syscall_id: usize) {
+        let current_tcb_inner = &mut self.current.as_mut().unwrap().inner_exclusive_access();
+        current_tcb_inner.syscall_times[syscall_id] = current_tcb_inner.syscall_times[syscall_id] + 1;
+    }
+
+    ///处理sys_task_info调用
+    fn get_task_info(&self, _ti: *mut TaskInfo) -> isize {
+        let current_tcb_inner = &self.current.as_ref().unwrap().inner_exclusive_access();
+        let current_time_us = get_time_us();
+        unsafe {
+            (*_ti).status = current_tcb_inner.task_status;
+            (*_ti).syscall_times = current_tcb_inner.syscall_times.clone();
+            (*_ti).time = (current_time_us - current_tcb_inner.start_time_us) / 1000;
+        }
+        0
+    }
+
+    /// 映射一个虚拟页号范围
+    fn map_current_va_range(&mut self, va_low: VirtAddr, va_high: VirtAddr, permission: MapPermission) -> isize {
+        let current_tcb_inner = &mut self.current.as_mut().unwrap().inner_exclusive_access();
+        let current_memory_set = &mut (current_tcb_inner.memory_set);
+
+        current_memory_set.map_va_range(va_low, va_high, permission)
+    }
+
+    /// 取消映射一个虚拟页号范围
+    fn unmap_current_va_range(&mut self, va_low: VirtAddr, va_high: VirtAddr) -> isize {
+        let current_tcb_inner = &mut self.current.as_mut().unwrap().inner_exclusive_access();
+        let current_memory_set = &mut (current_tcb_inner.memory_set);
+
+        current_memory_set.unmap_va_range(va_low, va_high)
+    }
+    //我添加的代码-结束
 }
 
 lazy_static! {
+    /// 处理器的实例
     pub static ref PROCESSOR: UPSafeCell<Processor> = unsafe { UPSafeCell::new(Processor::new()) };
 }
 
@@ -59,6 +102,13 @@ pub fn run_tasks() {
             let idle_task_cx_ptr = processor.get_idle_task_cx_ptr();
             // access coming task TCB exclusively
             let mut task_inner = task.inner_exclusive_access();
+            // 我添加的代码-开始
+            //需要判断任务是不是第一次被调度，通过判断started是否为false
+            if task_inner.started == false {
+                task_inner.start_time_us = get_time_us();
+                task_inner.started = true;
+            }
+            // 我添加的代码-结束
             let next_task_cx_ptr = &task_inner.task_cx as *const TaskContext;
             task_inner.task_status = TaskStatus::Running;
             // release coming task_inner manually
@@ -109,3 +159,29 @@ pub fn schedule(switched_task_cx_ptr: *mut TaskContext) {
         __switch(switched_task_cx_ptr, idle_task_cx_ptr);
     }
 }
+
+//我添加的代码-开始
+///在当前进程中记录一次中断调用
+pub fn record_one_syscall(syscall_id: usize) {
+    let mut processor = PROCESSOR.exclusive_access();
+    processor.record_one_syscall(syscall_id);
+}
+
+///处理sys_task_info调用
+pub fn get_task_info(_ti: *mut TaskInfo) -> isize {
+    let processor = PROCESSOR.exclusive_access();
+    processor.get_task_info(_ti)
+}
+
+/// 映射一个虚拟页号范围
+pub fn map_current_va_range(va_low: VirtAddr, va_high: VirtAddr, permission: MapPermission) -> isize {
+    let mut processor = PROCESSOR.exclusive_access();
+    processor.map_current_va_range(va_low, va_high, permission)
+}
+
+/// 映射一个虚拟页号范围
+pub fn unmap_current_va_range(va_low: VirtAddr, va_high: VirtAddr) -> isize {
+    let mut processor = PROCESSOR.exclusive_access();
+    processor.unmap_current_va_range(va_low, va_high)
+}
+//我添加的代码-结束
