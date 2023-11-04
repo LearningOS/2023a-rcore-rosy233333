@@ -41,12 +41,14 @@ pub struct TaskInfo {
     pub time: usize,
 }
 
+/// 程序退出
 pub fn sys_exit(exit_code: i32) -> ! {
     trace!("kernel:pid[{}] sys_exit", current_task().unwrap().pid.0);
     exit_current_and_run_next(exit_code);
     panic!("Unreachable in sys_exit!");
 }
 
+/// 程序放弃占有cpu
 pub fn sys_yield() -> isize {
     //trace!("kernel: sys_yield");
     suspend_current_and_run_next();
@@ -270,10 +272,12 @@ pub fn sys_spawn(_path: *const u8) -> isize {
     // 参考了实验os源代码中`fork`和`exec`的实现
     let token = current_user_token();
     let path = translated_str(token,_path);
-    if let Some(data) = get_app_data_by_name(path.as_str()) {
+    if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
+        let all_data = app_inode.read_all();
+
         let current_task = current_task().unwrap();
         // 创建新进程
-        let new_task = Arc::new(TaskControlBlock::new(data));
+        let new_task = Arc::new(TaskControlBlock::new(all_data.as_slice()));
 
         // 维护父子关系
         current_task.inner_exclusive_access().children.push(new_task.clone());
