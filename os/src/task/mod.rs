@@ -81,6 +81,13 @@ pub fn exit_current_and_run_next(exit_code: i32) {
     let mut task_inner = task.inner_exclusive_access();
     let process = task.process.upgrade().unwrap();
     let tid = task_inner.res.as_ref().unwrap().tid;
+
+    //在死锁检测结构中记录该线程已退出
+    let mut process_inner = process.inner_exclusive_access();
+    process_inner.mutex_dd.delete_task(tid);
+    process_inner.semaphore_dd.delete_task(tid);
+    drop(process_inner);
+
     // record exit code
     task_inner.exit_code = Some(exit_code);
     task_inner.res = None;
