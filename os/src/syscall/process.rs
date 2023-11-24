@@ -1,7 +1,9 @@
 //! Process management syscalls
 //!
+
 use alloc::sync::Arc;
 
+#[allow(unused_imports)]
 use crate::{
     config::{MAX_SYSCALL_NUM, PAGE_SIZE_BITS},
     fs::{open_file, OpenFlags},
@@ -58,7 +60,8 @@ pub fn sys_yield() -> isize {
 /// 获得进程的pid
 pub fn sys_getpid() -> isize {
     trace!("kernel: sys_getpid pid:{}", current_task().unwrap().pid.0);
-    current_task().unwrap().pid.0 as isize
+    let result = current_task().unwrap().pid.0 as isize;
+    result
 }
 
 /// fork进程
@@ -271,20 +274,26 @@ pub fn sys_spawn(_path: *const u8) -> isize {
     // 我添加的代码-开始
     // 参考了实验os源代码中`fork`和`exec`的实现
     let token = current_user_token();
-    let path = translated_str(token,_path);
+    let path = translated_str(token, _path);
+    trace!("1");
     if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
+        trace!("2");
         let all_data = app_inode.read_all();
+        trace!("3");
 
         let current_task = current_task().unwrap();
         // 创建新进程
-        let new_task = Arc::new(TaskControlBlock::new(all_data.as_slice()));
+        // let new_task = Arc::new(TaskControlBlock::new(all_data.as_slice()));
+        let new_task = current_task.fork();
+        new_task.exec(all_data.as_slice());
 
         // 维护父子关系
-        current_task.inner_exclusive_access().children.push(new_task.clone());
-        new_task.inner_exclusive_access().parent = Some(Arc::downgrade(&current_task));
+        // current_task.inner_exclusive_access().children.push(Arc::clone(&new_task));
+        // new_task.inner_exclusive_access().parent = Some(Arc::downgrade(&current_task));
 
         let new_pid = new_task.pid.0;
         add_task(new_task);
+        trace!("4");
         new_pid as isize
     } else {
         -1
