@@ -68,6 +68,7 @@ impl SuperBlock {
     }
 }
 /// Type of a disk inode
+#[derive(Debug)]
 #[derive(PartialEq)]
 pub enum DiskInodeType {
     File,
@@ -79,6 +80,7 @@ type IndirectBlock = [u32; BLOCK_SZ / 4];
 /// A data block
 type DataBlock = [u8; BLOCK_SZ];
 /// A disk inode
+#[derive(Debug)]
 #[repr(C)]
 pub struct DiskInode {
     pub size: u32,

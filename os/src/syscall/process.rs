@@ -270,21 +270,27 @@ pub fn sys_spawn(_path: *const u8) -> isize {
     );
     // 我添加的代码-开始
     // 参考了实验os源代码中`fork`和`exec`的实现
+    println!("1");
     let token = current_user_token();
     let path = translated_str(token,_path);
+    println!("2");
     if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
+        println!("3");
         let all_data = app_inode.read_all();
 
         let current_task = current_task().unwrap();
         // 创建新进程
         let new_task = Arc::new(TaskControlBlock::new(all_data.as_slice()));
+        println!("4");
 
         // 维护父子关系
         current_task.inner_exclusive_access().children.push(new_task.clone());
         new_task.inner_exclusive_access().parent = Some(Arc::downgrade(&current_task));
+        println!("5");
 
         let new_pid = new_task.pid.0;
         add_task(new_task);
+        println!("6");
         new_pid as isize
     } else {
         -1

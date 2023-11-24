@@ -47,7 +47,7 @@ impl Inode {
     /// Find inode under a disk inode by name
     fn find_inode_id(&self, name: &str, disk_inode: &DiskInode) -> Option<u32> {
         // assert it is a directory
-        assert!(disk_inode.is_dir());
+        assert!(disk_inode.is_dir(), "{:?}", disk_inode);
         let file_count = (disk_inode.size as usize) / DIRENT_SZ;
         let mut dirent = DirEntry::empty();
         for i in 0..file_count {
