@@ -274,6 +274,7 @@ impl TaskControlBlock {
         let old_break = inner.program_brk;
         let new_brk = inner.program_brk as isize + size as isize;
         if new_brk < heap_bottom as isize {
+            trace!("cpb end 1");
             return None;
         }
         let result = if size < 0 {
@@ -287,8 +288,10 @@ impl TaskControlBlock {
         };
         if result {
             inner.program_brk = new_brk as usize;
+            trace!("cpb end 2");
             Some(old_break)
         } else {
+            trace!("cpb end 3");
             None
         }
     }

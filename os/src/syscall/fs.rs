@@ -1,4 +1,5 @@
 //! File and filesystem-related syscalls
+
 use easy_fs::Stat;
 
 use crate::fs::{open_file, OpenFlags, ROOT_INODE};
@@ -9,6 +10,7 @@ use crate::task::{current_task, current_user_token};
 use crate::mm::PageTable;
 use crate::mm::VirtAddr;
 use crate::config::PAGE_SIZE_BITS;
+#[allow(unused_imports)]
 use easy_fs::StatMode;
 // 我新增的代码-结束
 
@@ -108,21 +110,35 @@ pub fn sys_fstat(_fd: usize, _st: *mut Stat) -> isize {
     if _fd >= inner.fd_table.len() {
         return -1;
     }
+    trace!("fstat 1");
     if let Some(file) = &inner.fd_table[_fd] {
         let result = file.fstat(&mut st_temp);
+        drop(inner);
+        drop(task);
         if result != 0 {
+            trace!("fstat end 1");
             result.try_into().unwrap()
         }
         else {
+            trace!("fstat 2");
             unsafe {
+                // let ino_va = &mut ((*_st).ino) as *mut u64;
+                // trace!("fstat 3");
+                // let ino_pa = map_user_va_to_pa(ino_va as usize) as *mut u64;
+                // trace!("fstat 4");
+                // let res = st_temp.ino;
+                // trace!("fstat 5");
+                // *ino_pa = res;
                 *(map_user_va_to_pa(&((*_st).ino) as *const u64 as usize) as *mut u64) = st_temp.ino;
                 *(map_user_va_to_pa(&((*_st).mode) as *const StatMode as usize) as *mut StatMode) = st_temp.mode;
                 *(map_user_va_to_pa(&((*_st).nlink) as *const u32 as usize) as *mut u32) = st_temp.nlink;
             }
+            trace!("fstat end 2");
             0
         }
     }
     else {
+        trace!("fstat end 3");
         -1
     }
     // 我添加的代码-结束
@@ -131,7 +147,7 @@ pub fn sys_fstat(_fd: usize, _st: *mut Stat) -> isize {
 /// YOUR JOB: Implement linkat.
 pub fn sys_linkat(_old_name: *const u8, _new_name: *const u8) -> isize {
     trace!(
-        "kernel:pid[{}] sys_linkat NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_linkat",
         current_task().unwrap().pid.0
     );
     // 我添加的代码-开始
@@ -145,7 +161,7 @@ pub fn sys_linkat(_old_name: *const u8, _new_name: *const u8) -> isize {
 /// YOUR JOB: Implement unlinkat.
 pub fn sys_unlinkat(_name: *const u8) -> isize {
     trace!(
-        "kernel:pid[{}] sys_unlinkat NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_unlinkat",
         current_task().unwrap().pid.0
     );
     // 我添加的代码-开始

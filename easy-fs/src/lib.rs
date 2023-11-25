@@ -18,3 +18,5 @@ use layout::*;
 pub use vfs::Inode;
 pub use vfs::Stat;
 pub use vfs::StatMode;
+
+extern crate log;

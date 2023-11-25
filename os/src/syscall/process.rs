@@ -148,7 +148,7 @@ fn map_user_va_to_pa(user_va: usize) -> usize {
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
 pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
-    trace!("kernel: sys_get_time");
+    // trace!("kernel: sys_get_time");
     // 我添加的代码-开始
     // 在第3章的sys_get_time上修改
     let us = get_time_us();
@@ -273,14 +273,13 @@ pub fn sys_spawn(_path: *const u8) -> isize {
     );
     // 我添加的代码-开始
     // 参考了实验os源代码中`fork`和`exec`的实现
-    println!("1");
     let token = current_user_token();
     let path = translated_str(token, _path);
-    trace!("1");
+    // trace!("1");
     if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
-        trace!("2");
+        // trace!("2");
         let all_data = app_inode.read_all();
-        trace!("3");
+        // trace!("3");
 
         let current_task = current_task().unwrap();
         // 创建新进程
@@ -294,7 +293,7 @@ pub fn sys_spawn(_path: *const u8) -> isize {
 
         let new_pid = new_task.pid.0;
         add_task(new_task);
-        trace!("4");
+        // trace!("4");
         new_pid as isize
     } else {
         -1

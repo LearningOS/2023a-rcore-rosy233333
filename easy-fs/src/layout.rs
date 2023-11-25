@@ -70,6 +70,7 @@ impl SuperBlock {
 /// Type of a disk inode
 #[derive(Debug)]
 #[derive(PartialEq)]
+#[derive(Clone)]
 pub enum DiskInodeType {
     File,
     Directory,
@@ -82,6 +83,7 @@ type DataBlock = [u8; BLOCK_SZ];
 /// A disk inode
 #[derive(Debug)]
 #[repr(C)]
+#[derive(Clone)]
 pub struct DiskInode {
     pub size: u32,
     /// 存储的u32为整个设备的块编号，不是数据区的块编号
@@ -92,10 +94,8 @@ pub struct DiskInode {
     pub indirect2: u32,
     type_: DiskInodeType,
     // 我添加的代码-开始
-    /// 指向一个磁盘块，其的0地址存放这个文件的引用计数
-    /// 存储的u32为整个设备的块编号，不是数据区的块编号
-    /// （我知道这很浪费空间，但是我实在想不到更好的方法了……）
-    pub nlink_ptr: u32
+    /// 引用计数
+    pub nlink: u32
     // 我添加的代码-介绍
 }
 
@@ -107,7 +107,7 @@ impl DiskInode {
         self.direct.iter_mut().for_each(|v| *v = 0);
         self.indirect1 = 0;
         self.indirect2 = 0;
-        self.nlink_ptr = 0; // 我添加的代码
+        self.nlink = 1; // 我添加的代码
         self.type_ = type_;
     }
     /// Whether this inode is a directory
@@ -403,45 +403,33 @@ impl DiskInode {
     // 我添加的代码-开始
     /// 获得引用计数
     pub fn get_nlink(&self, block_device: &Arc<dyn BlockDevice>) -> u32 {
-        get_block_cache(
-            (self.nlink_ptr) as usize,
-            Arc::clone(block_device)
-        )
-        .lock()
-        .read(0, |nlink: &u32| nlink.clone())
+        self.nlink
     }
     /// 修改引用计数
-    pub fn set_nlink(&self, new_nlink: usize, block_device: &Arc<dyn BlockDevice>) -> u32 {
-        get_block_cache(
-            (self.nlink_ptr) as usize,
-            Arc::clone(block_device)
-        )
-        .lock()
-        .modify(0, |nlink: &mut u32| {
-            *nlink = new_nlink as u32;
-            *nlink
-        })
+    pub fn set_nlink(&mut self, new_nlink: u32, block_device: &Arc<dyn BlockDevice>) -> u32 {
+        self.nlink = new_nlink;
+        self.nlink
     }
 
-    /// 创建该DiskInode的硬链接
-    pub fn link_from(&mut self, source: &Self, block_device: &Arc<dyn BlockDevice>) {
-        if source.is_dir() {
-            self.initialize(DiskInodeType::Directory);
-        }
-        else {
-            self.initialize(DiskInodeType::File);
-        }
-        for i in 0 .. INODE_DIRECT_COUNT {
-            self.direct[i] = source.direct[i];
-        }
-        self.size = source.size;
-        self.indirect1 = source.indirect1;
-        self.indirect2 = source.indirect2;
-        self.nlink_ptr = source.nlink_ptr;
+    // /// 创建该DiskInode的硬链接
+    // pub fn link_from(&mut self, source: &Self, block_device: &Arc<dyn BlockDevice>) {
+    //     if source.is_dir() {
+    //         self.initialize(DiskInodeType::Directory);
+    //     }
+    //     else {
+    //         self.initialize(DiskInodeType::File);
+    //     }
+    //     for i in 0 .. INODE_DIRECT_COUNT {
+    //         self.direct[i] = source.direct[i];
+    //     }
+    //     self.size = source.size;
+    //     self.indirect1 = source.indirect1;
+    //     self.indirect2 = source.indirect2;
+    //     self.nlink_ptr = source.nlink_ptr;
 
-        let mut nlink = self.get_nlink(block_device);
-        self.set_nlink((nlink + 1) as usize, block_device);
-    }
+    //     let mut nlink = self.get_nlink(block_device);
+    //     self.set_nlink((nlink + 1) as usize, block_device);
+    // }
     // 我添加的代码-结束
 }
 /// A directory entry
