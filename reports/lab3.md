@@ -1,4 +1,4 @@
-﻿# 第而次实验报告
+﻿# 第三次实验报告
 
 ## 学习内容
 
@@ -12,13 +12,13 @@
 
 我实现了stride调度算法，在TCB的inner字段中增加了记录stride调度算法所需的数据项`priority`和`stride`。增加了设置进程优先级的系统调用`set_priority`。最后，重写了`TaskManager::fetch`函数，让其每次选取`stride`值最小的进程进行调度，并且维护被调度的进程的`stride`值。
 
-### 问答作业
+## 问答作业
 
-#### 1. 实际情况是轮到 p1 执行吗？为什么？
+### 1. 实际情况是轮到 p1 执行吗？为什么？
 
 轮不到。因为溢出原因，p2执行完后，stride值变为260-256=4。
 
-#### 2. 为什么？尝试简单说明（不要求严格证明）。
+### 2. 为什么？尝试简单说明（不要求严格证明）。
 
 在初始状态下，所有程序stride=0，符合STRIDE_MAX – STRIDE_MIN <= BigStride / 2条件。
 
@@ -30,7 +30,7 @@
 
 由数学归纳法可证明，任意时刻均满足上式。
 
-#### 3. 已知以上结论，考虑溢出的情况下，可以为 Stride 设计特别的比较器，让 BinaryHeap<Stride> 的 pop 方法能返回真正最小的 Stride。补全下列代码中的 partial_cmp 函数，假设两个 Stride 永远不会相等。
+### 3. 已知以上结论，考虑溢出的情况下，可以为 Stride 设计特别的比较器，让 BinaryHeap<Stride> 的 pop 方法能返回真正最小的 Stride。补全下列代码中的 partial_cmp 函数，假设两个 Stride 永远不会相等。
 
 ```Rust
 use core::cmp::Ordering;
