@@ -273,6 +273,7 @@ pub fn sys_spawn(_path: *const u8) -> isize {
     );
     // 我添加的代码-开始
     // 参考了实验os源代码中`fork`和`exec`的实现
+    println!("1");
     let token = current_user_token();
     let path = translated_str(token, _path);
     trace!("1");
