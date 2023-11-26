@@ -3,6 +3,7 @@ use core::iter;
 use alloc::vec;
 
 /// 死锁检测数据结构
+#[derive(Debug)]
 #[derive(Clone)]
 pub struct DdStruct {
 
@@ -138,7 +139,7 @@ impl DdStruct {
             }
             else {
                 for resource in 0 .. self.resource_count {
-                    if (self.need[task][resource] as isize) < self.work[resource] {
+                    if (self.need[task][resource] as isize) > self.work[resource] {
                         ok = false;
                         break;
                     }
@@ -163,5 +164,11 @@ impl DdStruct {
             }
         }
         return -1;
+    }
+
+    /// 用于判断是否可以分配
+    #[allow(unused)]
+    pub fn allocate(tid: usize, num: usize) -> bool {
+        true
     }
 }

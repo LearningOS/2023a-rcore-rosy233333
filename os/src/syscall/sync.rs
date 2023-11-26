@@ -5,7 +5,7 @@ use alloc::sync::Arc;
 /// sleep syscall
 pub fn sys_sleep(ms: usize) -> isize {
     trace!(
-        "kernel:pid[{}] tid[{}] sys_sleep",
+        "kernel:pid[{}] tid[{}] sys_sleep, time = {}ms",
         current_task().unwrap().process.upgrade().unwrap().getpid(),
         current_task()
             .unwrap()
@@ -13,7 +13,8 @@ pub fn sys_sleep(ms: usize) -> isize {
             .res
             .as_ref()
             .unwrap()
-            .tid
+            .tid,
+        ms
     );
     let expire_ms = get_time_ms() + ms;
     let task = current_task().unwrap();
@@ -65,6 +66,7 @@ pub fn sys_mutex_create(blocking: bool) -> isize {
     }
 }
 /// mutex lock syscall
+#[allow(warnings)]
 pub fn sys_mutex_lock(mutex_id: usize) -> isize {
     trace!(
         "kernel:pid[{}] tid[{}] sys_mutex_lock",
@@ -83,28 +85,35 @@ pub fn sys_mutex_lock(mutex_id: usize) -> isize {
     // 维护死锁检测机构数据结构
     let tid: usize = current_task().unwrap().inner_exclusive_access().res.as_ref().unwrap().tid;
     let deadlock_detect = process_inner.deadlock_detect;
+    if deadlock_detect {
+        warn!("mutex deadlock detect on.");
+    }
     let mutex_dd = &mut process_inner.mutex_dd;
+    trace!("{:?}", mutex_dd);
     let mut dd_updated = false;
+
     // 先更新程序的需求，看是否安全
     mutex_dd.need[tid][mutex_id] += 1;
     if deadlock_detect && mutex_dd.check_state() == -1 {
         // 驳回需求
         mutex_dd.need[tid][mutex_id] -= 1;
+        warn!("mutex deadlock detected.");
         return -0xdead;
     }
-    // 如果现在资源足够分配，则尝试进行分配，看是否安全
-    if mutex_dd.work[mutex_id] >= 1 {
-        mutex_dd.need[tid][mutex_id] -= 1;
-        mutex_dd.allocation[tid][mutex_id] += 1;
-        mutex_dd.work[mutex_id] -= 1;
-        if deadlock_detect && mutex_dd.check_state() == -1 {
-            // 驳回需求，并恢复mutex_dd结构
-            mutex_dd.allocation[tid][mutex_id] -= 1;
-            mutex_dd.work[mutex_id] += 1;
-            return -0xdead;
-        }
-        dd_updated = true;
-    }
+
+    // // 如果现在资源足够分配，则尝试进行分配，看是否安全
+    // if mutex_dd.work[mutex_id] >= 1 {
+    //     mutex_dd.need[tid][mutex_id] -= 1;
+    //     mutex_dd.allocation[tid][mutex_id] += 1;
+    //     mutex_dd.work[mutex_id] -= 1;
+    //     if deadlock_detect && mutex_dd.check_state() == -1 {
+    //         // 驳回需求，并恢复mutex_dd结构
+    //         mutex_dd.allocation[tid][mutex_id] -= 1;
+    //         mutex_dd.work[mutex_id] += 1;
+    //         return -0xdead;
+    //     }
+    //     dd_updated = true;
+    // }
 
     let mutex = Arc::clone(process_inner.mutex_list[mutex_id].as_ref().unwrap());
     drop(process_inner);
@@ -118,6 +127,7 @@ pub fn sys_mutex_lock(mutex_id: usize) -> isize {
         let mutex_dd = &mut process_inner.mutex_dd;
 
         assert!(mutex_dd.work[mutex_id] >= 1);
+        assert!(mutex_dd.need[tid][mutex_id] >= 1);
         mutex_dd.need[tid][mutex_id] -= 1;
         mutex_dd.allocation[tid][mutex_id] += 1;
         mutex_dd.work[mutex_id] -= 1;
@@ -127,6 +137,7 @@ pub fn sys_mutex_lock(mutex_id: usize) -> isize {
             mutex_dd.allocation[tid][mutex_id] -= 1;
             mutex_dd.work[mutex_id] += 1;
             mutex.unlock();
+            warn!("mutex deadlock detected.");
             return -0xdead;
         }
     }
@@ -216,7 +227,13 @@ pub fn sys_semaphore_up(sem_id: usize) -> isize {
 
     // 更新死锁检测数据结构
     let tid: usize = current_task().unwrap().inner_exclusive_access().res.as_ref().unwrap().tid;
+    let deadlock_detect = process_inner.deadlock_detect;
     let semaphore_dd = &mut process_inner.semaphore_dd;
+    if deadlock_detect {
+        warn!("semaphore deadlock detect on.");
+        warn!("{:?}", semaphore_dd);
+        warn!("sem_up, tid: {}, sem_id: {}", tid, sem_id);
+    }
     // assert!(semaphore_dd.allocation[tid][sem_id] >= 1);
     if semaphore_dd.allocation[tid][sem_id] >= 1 {
         semaphore_dd.allocation[tid][sem_id] -= 1;
@@ -229,8 +246,7 @@ pub fn sys_semaphore_up(sem_id: usize) -> isize {
     0
 }
 /// semaphore down syscall
-#[allow(unused_variables)]
-#[allow(unused_assignments)]
+#[allow(warnings)]
 pub fn sys_semaphore_down(sem_id: usize) -> isize {
     trace!(
         "kernel:pid[{}] tid[{}] sys_semaphore_down",
@@ -251,12 +267,19 @@ pub fn sys_semaphore_down(sem_id: usize) -> isize {
     let tid: usize = current_task().unwrap().inner_exclusive_access().res.as_ref().unwrap().tid;
     let deadlock_detect = process_inner.deadlock_detect;
     let semaphore_dd = &mut process_inner.semaphore_dd;
+    if deadlock_detect {
+        warn!("semaphore deadlock detect on.");
+        warn!("{:?}", semaphore_dd);
+        warn!("sem_down, tid: {}, sem_id: {}", tid, sem_id);
+    }
+    trace!("{:?}", semaphore_dd);
     let mut dd_updated = false;
     // 先更新程序的需求，看是否安全
     semaphore_dd.need[tid][sem_id] += 1;
     if deadlock_detect && semaphore_dd.check_state() == -1 {
         // 驳回需求
         semaphore_dd.need[tid][sem_id] -= 1;
+        warn!("semaphore deadlock detected");
         return -0xdead;
     }
     // // 如果现在资源足够分配，则尝试进行分配，看是否安全
@@ -273,42 +296,41 @@ pub fn sys_semaphore_down(sem_id: usize) -> isize {
     //     dd_updated = true;
     // }
 
-    semaphore_dd.need[tid][sem_id] -= 1;
-    semaphore_dd.allocation[tid][sem_id] += 1;
-    semaphore_dd.work[sem_id] -= 1;
-    if deadlock_detect && semaphore_dd.check_state() == -1 {
-        // 驳回需求，并恢复mutex_dd结构
-        semaphore_dd.allocation[tid][sem_id] -= 1;
-        semaphore_dd.work[sem_id] += 1;
-        return -0xdead;
-    }
-    dd_updated = true;
+    // semaphore_dd.need[tid][sem_id] -= 1;
+    // semaphore_dd.allocation[tid][sem_id] += 1;
+    // semaphore_dd.work[sem_id] -= 1;
+    // if deadlock_detect && semaphore_dd.check_state() == -1 {
+    //     // 驳回需求，并恢复mutex_dd结构
+    //     semaphore_dd.allocation[tid][sem_id] -= 1;
+    //     semaphore_dd.work[sem_id] += 1;
+    //     return -0xdead;
+    // }
+    // dd_updated = true;
 
     drop(process_inner);
     sem.down();
 
-    // if !dd_updated {
-    //     // 之前因为资源不足没有立即分配，因此这里根据现在的情况更新死锁检测数据结构
-    //     let process = current_process();
-    //     let mut process_inner = process.inner_exclusive_access();
-    //     let semaphore_dd = &mut process_inner.semaphore_dd;
+    if !dd_updated {
+        // 之前因为资源不足没有立即分配，因此这里根据现在的情况更新死锁检测数据结构
+        let process = current_process();
+        let mut process_inner = process.inner_exclusive_access();
+        let semaphore_dd = &mut process_inner.semaphore_dd;
 
-    //     assert!(semaphore_dd.work[sem_id] >= 1);
-    //     semaphore_dd.need[tid][sem_id] -= 1;
-    //     semaphore_dd.allocation[tid][sem_id] += 1;
-    //     semaphore_dd.work[sem_id] -= 1;
-    //     // if semaphore_dd.work[sem_id] >= 1 {
-    //     //     semaphore_dd.work[sem_id] -= 1;
-    //     // }
-    //     // 若开启死锁检测，且进入了不安全状态
-    //     if deadlock_detect && semaphore_dd.check_state() == -1 {
-    //         // 驳回需求，恢复mutex_dd结构，释放已经分配的互斥锁
-    //         semaphore_dd.allocation[tid][sem_id] -= 1;
-    //         semaphore_dd.work[sem_id] += 1;
-    //         sem.up();
-    //         return -0xdead;
-    //     }
-    // }
+        assert!(semaphore_dd.work[sem_id] >= 1);
+        assert!(semaphore_dd.need[tid][sem_id] >= 1);
+        semaphore_dd.need[tid][sem_id] -= 1;
+        semaphore_dd.allocation[tid][sem_id] += 1;
+        semaphore_dd.work[sem_id] -= 1;
+        // 若开启死锁检测，且进入了不安全状态
+        if deadlock_detect && semaphore_dd.check_state() == -1 {
+            // 驳回需求，恢复mutex_dd结构，释放已经分配的互斥锁
+            semaphore_dd.allocation[tid][sem_id] -= 1;
+            semaphore_dd.work[sem_id] += 1;
+            sem.up();
+            warn!("semaphore deadlock detected");
+            return -0xdead;
+        }
+    }
 
     0
 }
