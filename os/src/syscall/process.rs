@@ -6,8 +6,13 @@ use crate::{
         current_process, current_task, current_user_token, exit_current_and_run_next, pid2process,
         suspend_current_and_run_next, SignalFlags, TaskStatus,
     },
+    timer::get_time_us,
 };
 use alloc::{string::String, sync::Arc, vec::Vec};
+
+use crate::mm::PageTable;
+use crate::mm::VirtAddr;
+use crate::config::PAGE_SIZE_BITS;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -157,17 +162,36 @@ pub fn sys_kill(pid: usize, signal: u32) -> isize {
     }
 }
 
+/// 将某个存储单元的用户空间地址转化为物理地址，以供读写
+fn map_user_va_to_pa(user_va: usize) -> usize {
+    let user_page_table = PageTable::from_token(current_user_token());
+    let vpn = VirtAddr(user_va).floor();
+    let offset = VirtAddr(user_va).page_offset();
+    let ppn = user_page_table.translate(vpn).unwrap().ppn();
+    (ppn.0 << PAGE_SIZE_BITS) + offset
+}
+
 /// get_time syscall
 ///
 /// YOUR JOB: get time with second and microsecond
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
 pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
-    // trace!(
-    //     "kernel:pid[{}] sys_get_time NOT IMPLEMENTED",
-    //     current_task().unwrap().process.upgrade().unwrap().getpid()
-    // );
-    -1
+    trace!("kernel: sys_get_time");
+    // 我添加的代码-开始
+    // 在第3章的sys_get_time上修改
+    let us = get_time_us();
+    unsafe {
+        let ts_sec_va = &((*_ts).sec) as *const usize;
+        let ts_usec_va = &((*_ts).usec) as *const usize;
+        let ts_sec_pa = map_user_va_to_pa(ts_sec_va as usize) as *mut usize;
+        let ts_usec_pa = map_user_va_to_pa(ts_usec_va as usize) as *mut usize;
+        *ts_sec_pa = us / 1_000_000;
+        *ts_usec_pa = us % 1_000_000;
+    }
+    // 我添加的代码-结束
+    0
+
 }
 
 /// task_info syscall
